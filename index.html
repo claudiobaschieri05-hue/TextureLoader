@@ -116,7 +116,6 @@
   <div class="label-tl">EARTH + MOON ORBIT SYSTEM</div>
   <div class="label-br">ONLINE / REALISTIC TEXTURES</div>
 
-  <!-- Telemetry -->
   <div class="panel info-panel">
     <strong>TELEMETRY</strong>
     <div class="tele-row"><span>Distance</span><span class="tele-val" id="moonDistance">384 400 km</span></div>
@@ -126,7 +125,6 @@
     <div class="tele-row"><span>Zoom</span><span class="tele-val" id="zoomLevel">4.20 ×</span></div>
   </div>
 
-  <!-- Controls -->
   <div class="panel ctrl-panel">
     <strong>CONTROLS</strong>
     <div>🖱 DRAG = Rotate &nbsp;|&nbsp; SCROLL = Zoom</div>
@@ -140,7 +138,6 @@
   <div class="vignette"></div>
 </div>
 
-<!-- Three.js r161 -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
 <script>
 'use strict';
@@ -162,10 +159,12 @@ scene.add(root);
 
 /* ─── Texture loader ────────────────────────────────────────────────────── */
 const loader = new THREE.TextureLoader();
-const BASE = 'https://threejs.org/examples/textures/planets/';
+// Aggiornato il base URL a un CDN che permette il CORS
+const BASE = 'https://cdn.jsdelivr.net/npm/three@0.161.0/examples/textures/planets/';
 
 const texEarth  = loader.load(BASE + 'earth_atmos_2048.jpg');
-const texBump   = loader.load(BASE + 'earth_bump_2048.jpg');
+// Three.js usa la normal map nei suoi esempi ufficiali
+const texNormal = loader.load(BASE + 'earth_normal_2048.jpg'); 
 const texSpec   = loader.load(BASE + 'earth_specular_2048.jpg');
 const texClouds = loader.load(BASE + 'earth_clouds_1024.png');
 const texMoon   = loader.load(BASE + 'moon_1024.jpg');
@@ -182,12 +181,12 @@ earthGroup.rotation.z = THREE.MathUtils.degToRad(23.5);
 const earth = new THREE.Mesh(
   new THREE.SphereGeometry(1, 96, 96),
   new THREE.MeshStandardMaterial({
-    map:         texEarth,
-    bumpMap:     texBump,
-    bumpScale:   0.12,
+    map:          texEarth,
+    normalMap:    texNormal, // Sostituito bumpMap con normalMap
+    normalScale:  new THREE.Vector2(0.8, 0.8), // Aggiustata l'intensità
     roughnessMap: texSpec,
-    roughness:   0.85,
-    metalness:   0.02
+    roughness:    0.85,
+    metalness:    0.02
   })
 );
 earthGroup.add(earth);
@@ -413,7 +412,7 @@ document.addEventListener('wheel', e => {
 /* Keyboard */
 document.addEventListener('keydown', e => {
   S.keys[e.key.toLowerCase()] = true;
-  if (e.key === ' ')                { S.autoRotate = !S.autoRotate; syncAutoBtn(); }
+  if (e.key === ' ')                 { S.autoRotate = !S.autoRotate; syncAutoBtn(); }
   if (e.key.toLowerCase() === 'p') { S.paused = !S.paused; syncPauseBtn(); }
   if (e.key.toLowerCase() === 'r') { camera.position.set(0,0,4.2); S.tgtX=S.tgtY=0; }
   if (e.key.toLowerCase() === 'v') {
@@ -481,6 +480,7 @@ function animate() {
     saturnGroup.rotation.y += 0.0004;
 
     /* 🛰️ Satellites */
+    saturnGroup.rotation.y += 0.0004;
     satellites.forEach(s => {
       s.userData.angle += s.userData.speed;
       const { dist, angle, h } = s.userData;
