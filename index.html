@@ -3,695 +3,490 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Earth + Moon Orbit HUD - Advanced</title>
+  <title>Earth + Moon Orbit HUD</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100vh;
-      background: radial-gradient(circle at center, #09131f 0%, #020407 58%, #000 100%);
-      overflow: hidden;
-      font-family: ui-monospace, Menlo, Consolas, monospace;
-    }
-    canvas {
-      display: block;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
       width: 100%;
       height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
     }
-    .hud {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      color: #7cffc9;
-      text-shadow: 0 0 10px rgba(124,255,201,.55);
-      mix-blend-mode: screen;
-    }
-    .label {
-      position: absolute;
-      left: 16px;
-      top: 16px;
-      letter-spacing: .16em;
-      font-size: 13px;
-    }
-    .label2 {
-      position: absolute;
-      right: 16px;
-      bottom: 16px;
-      letter-spacing: .16em;
-      font-size: 13px;
-    }
-    .info-panel {
-      position: absolute;
-      right: 16px;
-      top: 16px;
-      background: rgba(0,0,0,0.7);
-      border: 1px solid #7cffc9;
-      padding: 12px;
-      font-size: 11px;
-      line-height: 1.6;
-      max-width: 250px;
-      border-radius: 4px;
-    }
-    .controls-panel {
-      position: absolute;
-      left: 16px;
-      bottom: 16px;
-      background: rgba(0,0,0,0.7);
-      border: 1px solid #7cffc9;
-      padding: 12px;
-      font-size: 11px;
-      line-height: 1.8;
-      border-radius: 4px;
-    }
-    .scan {
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        rgba(255,255,255,.02) 0 2px,
-        transparent 2px 5px
-      );
-      opacity: .25;
-    }
-    .vignette {
-      position: absolute;
-      inset: 0;
-      box-shadow: inset 0 0 180px rgba(0,0,0,.85);
-    }
-    .button {
-      background: rgba(124,255,201,0.1);
-      border: 1px solid #7cffc9;
-      color: #7cffc9;
-      padding: 8px 12px;
-      border-radius: 3px;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 11px;
-      margin-top: 8px;
-      transition: all 0.3s;
-    }
-    .button:hover {
-      background: rgba(124,255,201,0.3);
-      text-shadow: 0 0 10px rgba(124,255,201,1);
-    }
-    .button.active {
-      background: rgba(124,255,201,0.5);
-      text-shadow: 0 0 15px rgba(124,255,201,1);
-    }
+    #canvas { display: block; width: 100%; height: 100%; }
+    .hud { position: fixed; inset: 0; pointer-events: none; color: #0ff; text-shadow: 0 0 10px #0ff; font-size: 12px; }
+    .hud-top-left { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); border: 2px solid #0ff; padding: 15px; border-radius: 5px; }
+    .hud-top-right { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.8); border: 2px solid #0ff; padding: 15px; border-radius: 5px; max-width: 280px; }
+    .hud-bottom-left { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); border: 2px solid #0ff; padding: 15px; border-radius: 5px; }
+    .hud-bottom-right { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8); border: 2px solid #0ff; padding: 15px; border-radius: 5px; }
+    .hud-title { font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #0ff; padding-bottom: 5px; }
+    .hud-item { margin: 5px 0; font-size: 11px; }
+    .button { background: rgba(0,255,255,0.1); border: 1px solid #0ff; color: #0ff; padding: 8px 12px; margin: 5px 5px 5px 0; cursor: pointer; border-radius: 3px; font-family: 'Courier New', monospace; transition: all 0.2s; }
+    .button:hover { background: rgba(0,255,255,0.3); box-shadow: 0 0 10px #0ff; }
+    .button.active { background: rgba(0,255,255,0.5); box-shadow: 0 0 15px #0ff; }
+    .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.7) 100%); pointer-events: none; }
+    .scan-line { position: absolute; inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,255,255,0.03) 0, rgba(0,255,255,0.03) 2px, transparent 2px, transparent 4px); pointer-events: none; animation: scanMove 8s linear infinite; }
+    @keyframes scanMove { 0% { transform: translateY(0); } 100% { transform: translateY(10px); } }
   </style>
 </head>
 <body>
+  <canvas id="canvas"></canvas>
   <div class="hud">
-    <div class="label">EARTH + MOON ORBIT SYSTEM</div>
-    <div class="label2">ONLINE / REALISTIC TEXTURES</div>
-    
-    <div class="info-panel" id="infoPanel">
-      <div><strong>SYSTEM INFO</strong></div>
-      <div id="moonDistance">Distance: 384,400 km</div>
-      <div id="moonSpeed">Speed: 1.022 km/s</div>
-      <div id="earthRotation">Rotation: 23.5°</div>
-      <div id="systemTime">Time: --:--:--</div>
-      <div id="zoomLevel">Zoom: 4.00x</div>
+    <div class="hud-top-left">
+      <div class="hud-title">⊞ EARTH SYSTEM</div>
+      <div class="hud-item">STATUS: ONLINE</div>
+      <div class="hud-item">MODE: OBSERVATION</div>
     </div>
-
-    <div class="controls-panel">
-      <div><strong>CONTROLS</strong></div>
-      <div>🖱️ DRAG = Rotate | SCROLL = Zoom</div>
-      <div>W/A/S/D = Pan | SPACE = Auto-rotate</div>
-      <div>P = Pause | R = Reset | V = Wireframe</div>
-      <button class="button active" id="bloomBtn">Bloom: ON</button>
-      <button class="button active" id="autoRotateBtn">Auto Rotate: ON</button>
+    <div class="hud-top-right">
+      <div class="hud-title">⊞ TELEMETRY</div>
+      <div class="hud-item">EARTH POS: <span id="earthPos">0.00, 0.00, 0.00</span></div>
+      <div class="hud-item">MOON DIST: <span id="moonDist">384,400 km</span></div>
+      <div class="hud-item">MOON SPEED: <span id="moonSpeed">1.022 km/s</span></div>
+      <div class="hud-item">ROTATION: <span id="rotation">0.0°</span></div>
+      <div class="hud-item">TIME: <span id="sysTime">--:--:--</span></div>
+      <div class="hud-item">ZOOM: <span id="zoomLevel">3.50x</span></div>
     </div>
-    
-    <div class="scan"></div>
+    <div class="hud-bottom-left">
+      <div class="hud-title">⊞ CONTROLS</div>
+      <div class="hud-item">🖱️ DRAG = ROTATE</div>
+      <div class="hud-item">🔄 SCROLL = ZOOM</div>
+      <div class="hud-item">⌨️ WASD = PAN</div>
+      <div class="hud-item">SPACE = AUTO-ROTATE</div>
+      <div class="hud-item">P = PAUSE | R = RESET</div>
+      <div class="hud-item">V = WIREFRAME</div>
+      <button class="button active" id="autoBtn">AUTO ROTATE</button>
+      <button class="button" id="pauseBtn">PLAY</button>
+    </div>
+    <div class="hud-bottom-right">
+      <div class="hud-title">⊞ OBJECTS</div>
+      <div class="hud-item">✓ EARTH (1)</div>
+      <div class="hud-item">✓ MOON (1)</div>
+      <div class="hud-item">✓ SATURN (1)</div>
+      <div class="hud-item">✓ SATELLITES (3)</div>
+      <div class="hud-item">✓ COMETS (2)</div>
+      <div class="hud-item">✓ STARS (4000+)</div>
+    </div>
+    <div class="scan-line"></div>
     <div class="vignette"></div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // ========== CONFIGURAZIONE SCENE ==========
+    // SCENE SETUP
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
-    camera.position.set(0, 0.5, 3.5);
+    scene.background = new THREE.Color(0x000000);
+    
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+    camera.position.set(0, 1.5, 3);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, precision: 'highp' });
+    const canvas = document.getElementById('canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x000000, 1);
-    renderer.gammaOutput = true;
-    renderer.gammaFactor = 2.2;
-    document.body.appendChild(renderer.domElement);
 
-    // ========== TEXTURE LOADER ==========
-    const textureLoader = new THREE.TextureLoader();
+    const state = {
+      autoRotate: true, isPaused: false, isWireframe: false, isDragging: false,
+      time: 0, rotX: 0, rotY: 0, targetRotX: 0, targetRotY: 0, panX: 0, panY: 0, keys: {}
+    };
 
-    // ========== TERRA - MOLTO PIÙ LUMINOSA ==========
-    const earthGeometry = new THREE.SphereGeometry(1, 128, 128);
-    const earthMaterial = new THREE.MeshPhongMaterial({
-      color: 0x4a7ba7,
-      emissive: 0x1a3a4a,
-      shininess: 50,
-      wireframe: false
-    });
-
-    const earth = new THREE.Mesh(earthGeometry, earthMaterial);
-    scene.add(earth);
-
-    textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg', (t) => {
-      t.anisotropy = 16;
-      earth.material.map = t;
-      earth.material.needsUpdate = true;
-    });
-
-    textureLoader.load('https://threejs.org/examples/textures/planets/earth_bump_2048.jpg', (t) => {
-      earth.material.bumpMap = t;
-      earth.material.bumpScale = 0.08;
-      earth.material.needsUpdate = true;
-    });
-
-    // ========== NUVOLE VISIBILI ==========
-    const cloudsGeometry = new THREE.SphereGeometry(1.018, 128, 128);
-    const cloudsMaterial = new THREE.MeshPhongMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.6,
-      depthWrite: false,
-      shininess: 5,
-      emissive: 0x555555
-    });
-    const clouds = new THREE.Mesh(cloudsGeometry, cloudsMaterial);
-    scene.add(clouds);
-
-    textureLoader.load('https://threejs.org/examples/textures/planets/earth_clouds_1024.png', (t) => {
-      clouds.material.map = t;
-      clouds.material.needsUpdate = true;
-    });
-
-    // ========== ATMOSFERA CON AURORE BOREALI ==========
-    const atmosphereGeometry = new THREE.SphereGeometry(1.08, 64, 64);
-    const atmosphereMaterial = new THREE.MeshPhongMaterial({
-      color: 0x4ef7ff,
-      transparent: true,
-      opacity: 0.2,
-      side: THREE.BackSide,
-      emissive: 0x2a7f99
-    });
-    const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
-    scene.add(atmosphere);
-
-    // Aurore boreali - anelli luminosi
-    const auroraGeometry = new THREE.TorusGeometry(1.1, 0.08, 16, 100);
-    const auroraMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
-      transparent: true,
-      opacity: 0.4,
-      emissive: 0x00ff88
-    });
-    const aurora1 = new THREE.Mesh(auroraGeometry, auroraMaterial);
-    aurora1.rotation.x = Math.PI * 0.3;
-    scene.add(aurora1);
-
-    const aurora2 = new THREE.Mesh(auroraGeometry.clone(), auroraMaterial.clone());
-    aurora2.rotation.x = Math.PI * 0.7;
-    aurora2.material.color.setHex(0xff00ff);
-    aurora2.material.emissive.setHex(0xff00ff);
-    scene.add(aurora2);
-
-    // ========== LUNA VISIBILE ==========
-    const moonGeometry = new THREE.SphereGeometry(0.27, 64, 64);
-    const moonMaterial = new THREE.MeshPhongMaterial({
-      color: 0xcccccc,
-      emissive: 0x444444,
-      shininess: 30
-    });
-    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-    scene.add(moon);
-
-    textureLoader.load('https://threejs.org/examples/textures/planets/moon_1024.jpg', (t) => {
-      moon.material.map = t;
-      moon.material.needsUpdate = true;
-    });
-
-    // ========== ORBITA DELLA LUNA ==========
-    const orbitCurve = new THREE.EllipseCurve(0, 0, 2.2, 1.55, 0, Math.PI * 2, false, 0);
-    const orbitPoints = orbitCurve.getPoints(256);
-    const orbitGeometry = new THREE.BufferGeometry().setFromPoints(orbitPoints);
-    const orbitMaterial = new THREE.LineBasicMaterial({
-      color: 0x4ef7ff,
-      transparent: true,
-      opacity: 0.5,
-      linewidth: 2
-    });
-    const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
-    orbitLine.rotation.x = Math.PI / 2.6;
-    scene.add(orbitLine);
-
-    // ========== SATURNO (CON ANELLI) ==========
-    const saturnGeometry = new THREE.SphereGeometry(0.4, 48, 48);
-    const saturnMaterial = new THREE.MeshPhongMaterial({
-      color: 0xf4d67f,
-      emissive: 0x665533,
-      shininess: 20
-    });
-    const saturn = new THREE.Mesh(saturnGeometry, saturnMaterial);
-    saturn.position.set(4, 1.2, -2);
-    scene.add(saturn);
-
-    // Anelli di Saturno
-    const ringGeometry = new THREE.TorusGeometry(0.75, 0.15, 16, 100);
-    const ringMaterial = new THREE.MeshPhongMaterial({
-      color: 0xe8d5b7,
-      emissive: 0x664422,
-      shininess: 30
-    });
-    const saturnRing = new THREE.Mesh(ringGeometry, ringMaterial);
-    saturnRing.rotation.x = Math.PI * 0.4;
-    saturn.add(saturnRing);
-
-    // ========== SATELLITI LUMINOSI ==========
-    const satellites = [];
-    for (let i = 0; i < 3; i++) {
-      const satGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-      const hue = i / 3;
-      const satMaterial = new THREE.MeshPhongMaterial({
-        color: new THREE.Color().setHSL(hue, 0.9, 0.6),
-        emissive: new THREE.Color().setHSL(hue, 0.9, 0.4),
-        shininess: 50
-      });
-      const satellite = new THREE.Mesh(satGeometry, satMaterial);
-      
-      const distance = 3 + i * 0.5;
-      const angle = (i / 3) * Math.PI * 2;
-      satellite.userData = {
-        distance: distance,
-        angle: angle,
-        speed: 0.005 + Math.random() * 0.003,
-        height: (Math.random() - 0.5) * 0.5
-      };
-      
-      scene.add(satellite);
-      satellites.push(satellite);
-    }
-
-    // Luci per satelliti
-    const satLight1 = new THREE.PointLight(0xff0088, 0.5, 30);
-    scene.add(satLight1);
-    const satLight2 = new THREE.PointLight(0x0088ff, 0.5, 30);
-    scene.add(satLight2);
-    const satLight3 = new THREE.PointLight(0xffff00, 0.5, 30);
-    scene.add(satLight3);
-
-    // ========== COMETE BRILLANTI ==========
-    const comets = [];
-    for (let i = 0; i < 2; i++) {
-      const cometGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-      const cometMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffff88,
-        emissive: 0xffff00
-      });
-      const comet = new THREE.Mesh(cometGeometry, cometMaterial);
-      
-      const angle = Math.random() * Math.PI * 2;
-      const distance = 5 + Math.random() * 3;
-      comet.userData = {
-        angle: angle,
-        distance: distance,
-        speed: 0.001 + Math.random() * 0.001,
-        trailLength: 20
-      };
-
-      // Scia della cometa
-      const trailGeometry = new THREE.BufferGeometry();
-      const trailPositions = [];
-      for (let j = 0; j < comet.userData.trailLength; j++) {
-        trailPositions.push(0, 0, 0);
-      }
-      trailGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(trailPositions), 3));
-      
-      const trailMaterial = new THREE.LineBasicMaterial({
-        color: 0xffff88,
-        transparent: true,
-        opacity: 0.6,
-        linewidth: 3
-      });
-      const trail = new THREE.Line(trailGeometry, trailMaterial);
-      
-      comet.userData.trail = trail;
-      comet.userData.trailPositions = trailPositions;
-
-      scene.add(comet);
-      scene.add(trail);
-      comets.push(comet);
-    }
-
-    // Luci comete
-    const cometLight1 = new THREE.PointLight(0xffff00, 1, 40);
-    scene.add(cometLight1);
-    const cometLight2 = new THREE.PointLight(0xffff88, 1, 40);
-    scene.add(cometLight2);
-
-    // ========== PARTICELLE SPAZIALI (POLVERE) ==========
-    const dustGeometry = new THREE.BufferGeometry();
-    const dustPositions = [];
-    const dustCount = 1500;
-
-    for (let i = 0; i < dustCount; i++) {
-      dustPositions.push(
-        (Math.random() - 0.5) * 25,
-        (Math.random() - 0.5) * 25,
-        (Math.random() - 0.5) * 25
-      );
-    }
-
-    dustGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(dustPositions), 3));
-    const dustMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.05,
-      sizeAttenuation: true,
-      transparent: true,
-      opacity: 0.6
-    });
-    const dust = new THREE.Points(dustGeometry, dustMaterial);
-    scene.add(dust);
-
-    // ========== NEBULE COLORATE ==========
-    const nebulaeGeometry = new THREE.SphereGeometry(100, 32, 32);
-    const nebulaMaterial = new THREE.MeshBasicMaterial({
-      color: 0x2a148c,
-      transparent: true,
-      opacity: 0.08,
-      side: THREE.BackSide
-    });
-    const nebula = new THREE.Mesh(nebulaeGeometry, nebulaMaterial);
-    scene.add(nebula);
-
-    // ========== STELLE DI SFONDO CON ANIMAZIONI ==========
-    const starsData = [];
-    const starCount = 4000;
-
-    for (let i = 0; i < starCount; i++) {
-      const r = 60 + Math.random() * 120;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 2 - 1);
-
-      const colorType = Math.random();
-      let color;
-      if (colorType < 0.6) {
-        color = 0xffffff;
-      } else if (colorType < 0.8) {
-        color = 0x7fc9ff;
-      } else {
-        color = 0xff9999;
-      }
-
-      starsData.push({
-        x: r * Math.sin(phi) * Math.cos(theta),
-        y: r * Math.sin(phi) * Math.sin(theta),
-        z: r * Math.cos(phi),
-        color: color,
-        baseSize: Math.random() * 0.2 + 0.08,
-        pulseSpeed: Math.random() * 0.02 + 0.01,
-        pulseAmount: Math.random() * 0.1 + 0.03,
-        phase: Math.random() * Math.PI * 2
-      });
-    }
-
-    const starsGeometry = new THREE.BufferGeometry();
-    const starPositions = [];
-    const starColors = [];
-
-    starsData.forEach(star => {
-      starPositions.push(star.x, star.y, star.z);
-      const c = new THREE.Color(star.color);
-      starColors.push(c.r, c.g, c.b);
-    });
-
-    starsGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPositions), 3));
-    starsGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(starColors), 3));
-
-    const starsMaterial = new THREE.PointsMaterial({
-      size: 0.15,
-      sizeAttenuation: true,
-      vertexColors: true,
-      transparent: true
-    });
-
-    const stars = new THREE.Points(starsGeometry, starsMaterial);
-    scene.add(stars);
-
-    // ========== LUCI PRINCIPALI ==========
+    // LUCI FORTI
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    sunLight.position.set(5, 3, 5);
-    sunLight.castShadow = true;
+    const sunLight = new THREE.DirectionalLight(0xffffff, 2);
+    sunLight.position.set(10, 5, 10);
     scene.add(sunLight);
 
-    const rimLight = new THREE.PointLight(0x48ffd1, 1.5, 60);
-    rimLight.position.set(-4, 1, -2);
-    scene.add(rimLight);
+    const pointLight1 = new THREE.PointLight(0x0088ff, 1.5, 100);
+    pointLight1.position.set(-10, 5, 0);
+    scene.add(pointLight1);
 
-    const skyLight = new THREE.PointLight(0x4ef7ff, 0.8, 50);
-    skyLight.position.set(0, 5, 0);
-    scene.add(skyLight);
+    const pointLight2 = new THREE.PointLight(0xff0088, 1, 100);
+    pointLight2.position.set(0, -10, 5);
+    scene.add(pointLight2);
 
-    // ========== CONTROLLI E STATO ==========
-    const state = {
-      mouse: { x: 0, y: 0 },
-      targetRotation: { x: 0, y: 0 },
-      isDragging: false,
-      isAutoRotating: true,
-      isPaused: false,
-      isWireframe: false,
-      panX: 0,
-      panY: 0,
-      time: 0
-    };
+    // EARTH
+    const earthGeom = new THREE.SphereGeometry(1, 256, 256);
+    const earthMat = new THREE.MeshPhongMaterial({
+      color: 0x4488ff,
+      emissive: 0x112244,
+      shininess: 30,
+      wireframe: false
+    });
+    const earth = new THREE.Mesh(earthGeom, earthMat);
+    scene.add(earth);
 
-    // ========== EVENT LISTENERS ==========
-    document.addEventListener('mousedown', () => {
-      state.isDragging = true;
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg', (texture) => {
+      earthMat.map = texture;
+      earthMat.needsUpdate = true;
     });
 
-    document.addEventListener('mouseup', () => {
-      state.isDragging = false;
+    textureLoader.load('https://threejs.org/examples/textures/planets/earth_bump_2048.jpg', (texture) => {
+      earthMat.bumpMap = texture;
+      earthMat.bumpScale = 0.1;
+      earthMat.needsUpdate = true;
     });
 
+    // NUVOLE
+    const cloudsGeom = new THREE.SphereGeometry(1.03, 256, 256);
+    const cloudsMat = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      emissive: 0x333333,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+      shininess: 10
+    });
+    const clouds = new THREE.Mesh(cloudsGeom, cloudsMat);
+    scene.add(clouds);
+
+    textureLoader.load('https://threejs.org/examples/textures/planets/earth_clouds_1024.png', (texture) => {
+      cloudsMat.map = texture;
+      cloudsMat.needsUpdate = true;
+    });
+
+    // ATMOSFERA
+    const atmosphereGeom = new THREE.SphereGeometry(1.12, 64, 64);
+    const atmosphereMat = new THREE.MeshBasicMaterial({
+      color: 0x0088ff,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.BackSide,
+      emissive: 0x0088ff
+    });
+    const atmosphere = new THREE.Mesh(atmosphereGeom, atmosphereMat);
+    scene.add(atmosphere);
+
+    // AURORA
+    for (let i = 0; i < 2; i++) {
+      const auroraGeom = new THREE.TorusGeometry(1.15, 0.12, 32, 256);
+      const auroraMat = new THREE.MeshBasicMaterial({
+        color: i === 0 ? 0x00ff88 : 0xff00ff,
+        emissive: i === 0 ? 0x00ff88 : 0xff00ff,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.DoubleSide
+      });
+      const aurora = new THREE.Mesh(auroraGeom, auroraMat);
+      aurora.rotation.x = Math.PI / 3 + i * Math.PI / 5;
+      scene.add(aurora);
+    }
+
+    // LUNA
+    const moonGeom = new THREE.SphereGeometry(0.27, 128, 128);
+    const moonMat = new THREE.MeshPhongMaterial({
+      color: 0xcccccc,
+      emissive: 0x444444,
+      shininess: 25
+    });
+    const moon = new THREE.Mesh(moonGeom, moonMat);
+    scene.add(moon);
+
+    textureLoader.load('https://threejs.org/examples/textures/planets/moon_1024.jpg', (texture) => {
+      moonMat.map = texture;
+      moonMat.needsUpdate = true;
+    });
+
+    // LUNA ORBITA
+    const orbitGeom = new THREE.BufferGeometry();
+    const orbitPoints = [];
+    for (let i = 0; i <= 256; i++) {
+      const angle = (i / 256) * Math.PI * 2;
+      orbitPoints.push(
+        Math.cos(angle) * 2.5,
+        Math.sin(angle) * 1.6 * 0.5,
+        Math.sin(angle) * 1.6 * Math.cos(Math.PI / 2.6)
+      );
+    }
+    orbitGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(orbitPoints), 3));
+    const orbitMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6, linewidth: 3 });
+    const orbitLine = new THREE.Line(orbitGeom, orbitMat);
+    scene.add(orbitLine);
+
+    // SATURNO
+    const saturnGeom = new THREE.SphereGeometry(0.5, 64, 64);
+    const saturnMat = new THREE.MeshPhongMaterial({
+      color: 0xf4d67f,
+      emissive: 0x664422,
+      shininess: 30
+    });
+    const saturn = new THREE.Mesh(saturnGeom, saturnMat);
+    saturn.position.set(4, 1.5, -1.5);
+    scene.add(saturn);
+
+    const ringGeom = new THREE.TorusGeometry(0.9, 0.2, 32, 256);
+    const ringMat = new THREE.MeshPhongMaterial({
+      color: 0xd4a574,
+      emissive: 0x664422,
+      side: THREE.DoubleSide,
+      shininess: 30
+    });
+    const ring = new THREE.Mesh(ringGeom, ringMat);
+    ring.rotation.x = Math.PI * 0.35;
+    saturn.add(ring);
+
+    // SATELLITI
+    const satellites = [];
+    const satColors = [0xff4444, 0x44ff44, 0x4444ff];
+    for (let i = 0; i < 3; i++) {
+      const satGeom = new THREE.SphereGeometry(0.15, 32, 32);
+      const satMat = new THREE.MeshPhongMaterial({
+        color: satColors[i],
+        emissive: satColors[i],
+        shininess: 50
+      });
+      const sat = new THREE.Mesh(satGeom, satMat);
+      sat.userData = {
+        distance: 3 + i * 0.6,
+        angle: (i / 3) * Math.PI * 2,
+        speed: 0.004 + Math.random() * 0.002,
+        height: (Math.random() - 0.5) * 0.3
+      };
+      scene.add(sat);
+      satellites.push(sat);
+
+      const satLight = new THREE.PointLight(satColors[i], 1.5, 50);
+      scene.add(satLight);
+      sat.userData.light = satLight;
+    }
+
+    // COMETE
+    const comets = [];
+    for (let i = 0; i < 2; i++) {
+      const cometGeom = new THREE.SphereGeometry(0.2, 32, 32);
+      const cometMat = new THREE.MeshBasicMaterial({
+        color: 0xffff88,
+        emissive: 0xffff00
+      });
+      const comet = new THREE.Mesh(cometGeom, cometMat);
+      comet.userData = {
+        angle: Math.random() * Math.PI * 2,
+        distance: 5 + Math.random() * 2,
+        speed: 0.0008 + Math.random() * 0.0006,
+        trailPositions: [],
+        trailLength: 30
+      };
+      for (let j = 0; j < comet.userData.trailLength; j++) {
+        comet.userData.trailPositions.push(0, 0, 0);
+      }
+      const trailGeom = new THREE.BufferGeometry();
+      trailGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(comet.userData.trailPositions), 3));
+      const trailMat = new THREE.LineBasicMaterial({ color: 0xffff88, transparent: true, opacity: 0.8, linewidth: 3 });
+      const trail = new THREE.Line(trailGeom, trailMat);
+      comet.userData.trail = trail;
+      scene.add(comet);
+      scene.add(trail);
+      comets.push(comet);
+
+      const cometLight = new THREE.PointLight(0xffff00, 2, 80);
+      scene.add(cometLight);
+      comet.userData.light = cometLight;
+    }
+
+    // POLVERE SPAZIALE
+    const dustGeom = new THREE.BufferGeometry();
+    const dustPos = [];
+    for (let i = 0; i < 2000; i++) {
+      dustPos.push(
+        (Math.random() - 0.5) * 40,
+        (Math.random() - 0.5) * 40,
+        (Math.random() - 0.5) * 40
+      );
+    }
+    dustGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(dustPos), 3));
+    const dustMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.1,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.8
+    });
+    const dust = new THREE.Points(dustGeom, dustMat);
+    scene.add(dust);
+
+    // STELLE
+    const starsGeom = new THREE.BufferGeometry();
+    const starPos = [];
+    const starCol = [];
+    const starColors = [0xffffff, 0xffffcc, 0xccccff, 0xffcccc];
+    for (let i = 0; i < 5000; i++) {
+      const r = 100 + Math.random() * 200;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      starPos.push(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
+      );
+      const col = new THREE.Color(starColors[Math.floor(Math.random() * starColors.length)]);
+      starCol.push(col.r, col.g, col.b);
+    }
+    starsGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPos), 3));
+    starsGeom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(starCol), 3));
+    const starsMat = new THREE.PointsMaterial({
+      size: 0.25,
+      sizeAttenuation: true,
+      vertexColors: true,
+      transparent: true,
+      opacity: 1
+    });
+    const stars = new THREE.Points(starsGeom, starsMat);
+    scene.add(stars);
+
+    // NEBULA
+    const nebulaGeom = new THREE.SphereGeometry(150, 32, 32);
+    const nebulaMat = new THREE.MeshBasicMaterial({
+      color: 0x2a0a6a,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.BackSide
+    });
+    const nebula = new THREE.Mesh(nebulaGeom, nebulaMat);
+    scene.add(nebula);
+
+    // EVENTS
+    document.addEventListener('mousedown', () => { state.isDragging = true; });
+    document.addEventListener('mouseup', () => { state.isDragging = false; });
     document.addEventListener('mousemove', (e) => {
-      state.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      state.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
       if (state.isDragging) {
-        state.targetRotation.y += e.movementX * 0.005;
-        state.targetRotation.x += e.movementY * 0.005;
-        state.isAutoRotating = false;
+        state.targetRotY += e.movementX * 0.005;
+        state.targetRotX += e.movementY * 0.005;
+        state.autoRotate = false;
+        document.getElementById('autoBtn').classList.remove('active');
       }
     });
-
     document.addEventListener('wheel', (e) => {
       e.preventDefault();
-      camera.position.z += e.deltaY * 0.003;
-      camera.position.z = Math.max(1.5, Math.min(10, camera.position.z));
+      camera.position.z += e.deltaY * 0.004;
+      camera.position.z = Math.max(1, Math.min(20, camera.position.z));
     }, { passive: false });
-
-    // ========== KEYBOARD CONTROLS ==========
-    const keys = {};
     document.addEventListener('keydown', (e) => {
-      keys[e.key.toLowerCase()] = true;
-
-      if (e.key.toLowerCase() === ' ') {
-        state.isAutoRotating = !state.isAutoRotating;
-        document.getElementById('autoRotateBtn').classList.toggle('active');
+      const key = e.key.toLowerCase();
+      state.keys[key] = true;
+      if (key === ' ') {
+        state.autoRotate = !state.autoRotate;
+        document.getElementById('autoBtn').classList.toggle('active');
       }
-      if (e.key.toLowerCase() === 'p') {
+      if (key === 'p') {
         state.isPaused = !state.isPaused;
+        document.getElementById('pauseBtn').textContent = state.isPaused ? 'PAUSED' : 'PLAY';
+        document.getElementById('pauseBtn').classList.toggle('active');
       }
-      if (e.key.toLowerCase() === 'r') {
-        state.targetRotation = { x: 0, y: 0 };
-        camera.position.set(0, 0.5, 3.5);
+      if (key === 'r') {
+        camera.position.set(0, 1.5, 3);
+        state.targetRotX = 0;
+        state.targetRotY = 0;
         state.panX = 0;
         state.panY = 0;
       }
-      if (e.key.toLowerCase() === 'v') {
+      if (key === 'v') {
         state.isWireframe = !state.isWireframe;
-        toggleWireframe();
+        earth.material.wireframe = state.isWireframe;
+        moon.material.wireframe = state.isWireframe;
+        clouds.material.wireframe = state.isWireframe;
+        saturn.material.wireframe = state.isWireframe;
       }
     });
+    document.addEventListener('keyup', (e) => { state.keys[e.key.toLowerCase()] = false; });
 
-    document.addEventListener('keyup', (e) => {
-      keys[e.key.toLowerCase()] = false;
+    document.getElementById('autoBtn').addEventListener('click', () => {
+      state.autoRotate = !state.autoRotate;
+      document.getElementById('autoBtn').classList.toggle('active');
+    });
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      state.isPaused = !state.isPaused;
+      document.getElementById('pauseBtn').textContent = state.isPaused ? 'PAUSED' : 'PLAY';
+      document.getElementById('pauseBtn').classList.toggle('active');
     });
 
-    // ========== BUTTONS ==========
-    document.getElementById('bloomBtn').addEventListener('click', function() {
-      this.classList.toggle('active');
-      this.textContent = this.classList.contains('active') ? 'Bloom: ON' : 'Bloom: OFF';
-    });
-
-    document.getElementById('autoRotateBtn').addEventListener('click', function() {
-      state.isAutoRotating = !state.isAutoRotating;
-      this.classList.toggle('active');
-      this.textContent = 'Auto Rotate: ' + (state.isAutoRotating ? 'ON' : 'OFF');
-    });
-
-    // ========== WIREFRAME TOGGLE ==========
-    function toggleWireframe() {
-      earth.material.wireframe = state.isWireframe;
-      moon.material.wireframe = state.isWireframe;
-      clouds.material.wireframe = state.isWireframe;
-      saturn.material.wireframe = state.isWireframe;
-    }
-
-    // ========== ANIMAZIONE PRINCIPALE ==========
+    // ANIMATION
     let moonAngle = 0;
-    let sceneRotationX = 0;
-    let sceneRotationY = 0;
-
     function animate() {
       requestAnimationFrame(animate);
 
       if (!state.isPaused) {
         state.time += 0.016;
 
-        // Controlli WASD
         const panSpeed = 0.02;
-        if (keys['w']) state.panY -= panSpeed;
-        if (keys['s']) state.panY += panSpeed;
-        if (keys['a']) state.panX -= panSpeed;
-        if (keys['d']) state.panX += panSpeed;
+        if (state.keys['w']) state.panY -= panSpeed;
+        if (state.keys['s']) state.panY += panSpeed;
+        if (state.keys['a']) state.panX -= panSpeed;
+        if (state.keys['d']) state.panX += panSpeed;
 
-        // Auto-rotate
-        if (state.isAutoRotating) {
-          state.targetRotation.y += 0.0002;
-        }
+        if (state.autoRotate) state.targetRotY += 0.0002;
 
-        // Interpolazione smooth rotazione
-        sceneRotationX += (state.targetRotation.x - sceneRotationX) * 0.1;
-        sceneRotationY += (state.targetRotation.y - sceneRotationY) * 0.1;
+        state.rotX += (state.targetRotX - state.rotX) * 0.08;
+        state.rotY += (state.targetRotY - state.rotY) * 0.08;
 
-        // Applica rotazioni
-        earth.rotation.y += 0.0005;
-        earth.rotation.x = sceneRotationX;
-        earth.rotation.z += Math.sin(state.time * 0.0001) * 0.0002;
-
-        clouds.rotation.y += 0.0007;
-        clouds.rotation.x = sceneRotationX;
-
+        earth.rotation.y = state.rotY;
+        earth.rotation.x = state.rotX;
+        earth.rotation.z += 0.0005;
+        clouds.rotation.y += 0.0008;
+        clouds.rotation.x = state.rotX;
         atmosphere.rotation.y -= 0.0002;
-        atmosphere.rotation.x = sceneRotationX;
+        atmosphere.rotation.x = state.rotX;
 
-        // Aurore boreali
-        aurora1.rotation.x += 0.0005;
-        aurora1.rotation.y += 0.0003;
-        aurora1.material.opacity = 0.3 + Math.sin(state.time * 0.002) * 0.15;
+        moonAngle += 0.004;
+        moon.position.x = Math.cos(moonAngle) * 2.5;
+        moon.position.z = Math.sin(moonAngle) * 1.6 * Math.cos(Math.PI / 2.6);
+        moon.position.y = Math.sin(moonAngle) * 1.6 * Math.sin(Math.PI / 2.6);
+        moon.rotation.y += 0.005;
 
-        aurora2.rotation.x -= 0.0003;
-        aurora2.rotation.y += 0.0005;
-        aurora2.material.opacity = 0.3 + Math.cos(state.time * 0.0025) * 0.15;
-
-        // Orbita Luna
-        moonAngle += 0.002;
-        moon.position.x = Math.cos(moonAngle) * 2.2;
-        moon.position.z = Math.sin(moonAngle) * 1.55 * Math.cos(Math.PI / 2.6);
-        moon.position.y = Math.sin(moonAngle) * 1.55 * Math.sin(Math.PI / 2.6);
-        moon.rotation.y += 0.003;
-        moon.rotation.x = sceneRotationX;
-
-        // Orbita line
-        orbitLine.rotation.x = Math.PI / 2.6 + sceneRotationX;
-
-        // Saturno rotazione
         saturn.rotation.y += 0.0003;
-        saturn.rotation.x = sceneRotationX * 0.5;
 
-        // Satelliti
-        satellites.forEach((satellite, idx) => {
-          satellite.userData.angle += satellite.userData.speed;
-          satellite.position.x = Math.cos(satellite.userData.angle) * satellite.userData.distance;
-          satellite.position.y = satellite.userData.height + Math.sin(state.time * 0.002) * 0.2;
-          satellite.position.z = Math.sin(satellite.userData.angle) * satellite.userData.distance;
-          satellite.rotation.y += 0.01;
-
-          // Aggiorna luci satelliti
-          const lights = [satLight1, satLight2, satLight3];
-          lights[idx].position.copy(satellite.position);
+        satellites.forEach(sat => {
+          sat.userData.angle += sat.userData.speed;
+          sat.position.x = Math.cos(sat.userData.angle) * sat.userData.distance;
+          sat.position.y = sat.userData.height + Math.sin(state.time * 0.001) * 0.3;
+          sat.position.z = Math.sin(sat.userData.angle) * sat.userData.distance;
+          sat.rotation.y += 0.02;
+          sat.userData.light.position.copy(sat.position);
         });
 
-        // Comete
-        comets.forEach((comet, idx) => {
+        comets.forEach(comet => {
           comet.userData.angle += comet.userData.speed;
-          const x = Math.cos(comet.userData.angle) * comet.userData.distance;
-          const y = Math.sin(state.time * 0.0005) * 2;
-          const z = Math.sin(comet.userData.angle) * comet.userData.distance;
-
-          comet.position.set(x, y, z);
-          comet.rotation.y += 0.02;
-
-          // Scia cometa
+          const cx = Math.cos(comet.userData.angle) * comet.userData.distance;
+          const cy = Math.sin(state.time * 0.0003) * 3;
+          const cz = Math.sin(comet.userData.angle) * comet.userData.distance;
+          comet.position.set(cx, cy, cz);
+          comet.rotation.y += 0.03;
+          comet.userData.light.position.copy(comet.position);
           const trailPos = comet.userData.trailPositions;
           for (let i = trailPos.length - 3; i >= 3; i -= 3) {
             trailPos[i] = trailPos[i - 3];
             trailPos[i + 1] = trailPos[i - 2];
             trailPos[i + 2] = trailPos[i - 1];
           }
-          trailPos[0] = x;
-          trailPos[1] = y;
-          trailPos[2] = z;
-
+          trailPos[0] = cx;
+          trailPos[1] = cy;
+          trailPos[2] = cz;
           comet.userData.trail.geometry.attributes.position.needsUpdate = true;
-
-          // Aggiorna luci comete
-          const cometLights = [cometLight1, cometLight2];
-          cometLights[idx].position.copy(comet.position);
         });
 
-        // Polvere spaziale
-        dust.rotation.x += 0.00001;
-        dust.rotation.y += 0.00003;
-
-        // Nebula
-        nebula.rotation.y += 0.00002;
-        nebula.rotation.z += 0.00001;
-
-        // Stelle
-        starsMaterial.size = 0.12 + Math.sin(state.time * 0.001) * 0.04;
-        stars.rotation.y += 0.00003;
-
-        // Effetto parallax
-        if (!state.isDragging) {
-          state.targetRotation.x *= 0.95;
-          state.targetRotation.y *= 0.95;
-        }
-
-        camera.position.x = state.panX;
-        camera.position.y = state.panY + 0.5;
+        dust.rotation.x += 0.00005;
+        dust.rotation.y += 0.00008;
+        stars.rotation.y += 0.00005;
+        starsMat.size = 0.2 + Math.sin(state.time * 0.0008) * 0.1;
+        nebula.rotation.y += 0.00001;
       }
 
-      // ========== UPDATE INFO PANEL ==========
-      document.getElementById('moonDistance').textContent = 
-        'Distance: ' + (384400 - Math.random() * 100).toFixed(0) + ' km';
-      document.getElementById('moonSpeed').textContent = 
-        'Speed: ' + (1.022 + Math.sin(state.time * 0.001) * 0.01).toFixed(3) + ' km/s';
-      document.getElementById('earthRotation').textContent = 
-        'Rotation: ' + ((state.time * 0.5) % 360).toFixed(1) + '°';
-      
-      const date = new Date();
-      document.getElementById('systemTime').textContent = 
-        'Time: ' + date.getHours().toString().padStart(2, '0') + ':' + 
-        date.getMinutes().toString().padStart(2, '0') + ':' + 
-        date.getSeconds().toString().padStart(2, '0');
-      
-      document.getElementById('zoomLevel').textContent = 
-        'Zoom: ' + camera.position.z.toFixed(2) + 'x';
+      camera.position.x = state.panX;
+      camera.position.y = 1.5 + state.panY;
+
+      document.getElementById('earthPos').textContent = earth.position.x.toFixed(2) + ', ' + earth.position.y.toFixed(2) + ', ' + earth.position.z.toFixed(2);
+      document.getElementById('moonDist').textContent = (384400 - Math.random() * 50).toFixed(0) + ' km';
+      document.getElementById('moonSpeed').textContent = (1.022 + Math.sin(state.time * 0.001) * 0.01).toFixed(3) + ' km/s';
+      document.getElementById('rotation').textContent = ((state.time * 0.5) % 360).toFixed(1) + '°';
+      const now = new Date();
+      document.getElementById('sysTime').textContent = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+      document.getElementById('zoomLevel').textContent = camera.position.z.toFixed(2) + 'x';
 
       renderer.render(scene, camera);
     }
-
     animate();
 
-    // ========== RESIZE ==========
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
