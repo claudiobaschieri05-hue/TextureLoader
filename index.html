@@ -3,24 +3,69 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Earth + Moon</title>
+  <title>Earth + Moon Orbit HUD</title>
   <style>
     body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100vh;
-      background: #000;
+      background: radial-gradient(circle at center, #09131f 0%, #020407 58%, #000 100%);
       overflow: hidden;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
     }
     canvas {
       display: block;
       width: 100%;
       height: 100%;
     }
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      color: #7cffc9;
+      text-shadow: 0 0 10px rgba(124,255,201,.55);
+      mix-blend-mode: screen;
+    }
+    .label {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      letter-spacing: .16em;
+      font-size: 13px;
+    }
+    .label2 {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      letter-spacing: .16em;
+      font-size: 13px;
+    }
+    .scan {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,.02) 0 2px,
+        transparent 2px 5px
+      );
+      opacity: .25;
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      box-shadow: inset 0 0 180px rgba(0,0,0,.85);
+    }
   </style>
 </head>
 <body>
+  <div class="hud">
+    <div class="label">EARTH + MOON ORBIT</div>
+    <div class="label2">ONLINE / REALISTIC TEXTURES</div>
+    <div class="scan"></div>
+    <div class="vignette"></div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     // Scene
@@ -28,52 +73,208 @@
     
     // Camera
     const camera = new THREE.PerspectiveCamera(
-      75,
+      45,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000
+      10000
     );
-    camera.position.z = 3;
+    camera.position.set(0, 1.5, 4);
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
     document.body.appendChild(renderer.domElement);
 
-    // Luce Ambiente
-    const light = new THREE.AmbientLight(0xffffff, 1);
-    scene.add(light);
+    // Texture Loader
+    const textureLoader = new THREE.TextureLoader();
 
-    // Luce Direzionale
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
+    // TERRA - REALISTICA
+    const earthGeometry = new THREE.SphereGeometry(1, 128, 128);
+    
+    let earthMap, earthBump, earthSpec;
+    
+    // Carica texture con fallback a colore
+    textureLoader.load(
+      'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+      (texture) => {
+        earthMap = texture;
+        earth.material.map = earthMap;
+        earth.material.needsUpdate = true;
+      },
+      undefined,
+      () => console.log('Earth texture fallback')
+    );
 
-    // TERRA
-    const earthGeometry = new THREE.SphereGeometry(1, 32, 32);
-    const earthMaterial = new THREE.MeshPhongMaterial({ color: 0x1f4788 });
+    textureLoader.load(
+      'https://threejs.org/examples/textures/planets/earth_bump_2048.jpg',
+      (texture) => {
+        earthBump = texture;
+        earth.material.bumpMap = earthBump;
+        earth.material.bumpScale = 0.05;
+        earth.material.needsUpdate = true;
+      }
+    );
+
+    textureLoader.load(
+      'https://threejs.org/examples/textures/planets/earth_specular_2048.jpg',
+      (texture) => {
+        earthSpec = texture;
+        earth.material.roughnessMap = earthSpec;
+        earth.material.needsUpdate = true;
+      }
+    );
+
+    const earthMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2a5aa4,
+      metalness: 0.1,
+      roughness: 0.8,
+      emissive: 0x000000
+    });
+
     const earth = new THREE.Mesh(earthGeometry, earthMaterial);
     scene.add(earth);
 
+    // NUVOLE
+    const cloudsGeometry = new THREE.SphereGeometry(1.015, 128, 128);
+    let cloudMap;
+    
+    textureLoader.load(
+      'https://threejs.org/examples/textures/planets/earth_clouds_1024.png',
+      (texture) => {
+        cloudMap = texture;
+        clouds.material.map = cloudMap;
+        clouds.material.needsUpdate = true;
+      }
+    );
+
+    const cloudsMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+      metalness: 0,
+      roughness: 1
+    });
+
+    const clouds = new THREE.Mesh(cloudsGeometry, cloudsMaterial);
+    scene.add(clouds);
+
+    // ATMOSFERA
+    const atmosphereGeometry = new THREE.SphereGeometry(1.06, 64, 64);
+    const atmosphereMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4ef7ff,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide
+    });
+    const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+    scene.add(atmosphere);
+
     // LUNA
-    const moonGeometry = new THREE.SphereGeometry(0.27, 32, 32);
-    const moonMaterial = new THREE.MeshPhongMaterial({ color: 0x999999 });
+    const moonGeometry = new THREE.SphereGeometry(0.27, 64, 64);
+    let moonMap;
+    
+    textureLoader.load(
+      'https://threejs.org/examples/textures/planets/moon_1024.jpg',
+      (texture) => {
+        moonMap = texture;
+        moon.material.map = moonMap;
+        moon.material.needsUpdate = true;
+      }
+    );
+
+    const moonMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb0b0b0,
+      roughness: 0.95,
+      metalness: 0,
+      emissive: 0x1a1a1a
+    });
+
     const moon = new THREE.Mesh(moonGeometry, moonMaterial);
     scene.add(moon);
 
-    // Animazione
+    // ORBITA DELLA LUNA (linea ellittica)
+    const orbitCurve = new THREE.EllipseCurve(0, 0, 2.2, 1.55, 0, Math.PI * 2, false, 0);
+    const orbitPoints = orbitCurve.getPoints(256);
+    const orbitGeometry = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+    const orbitMaterial = new THREE.LineBasicMaterial({
+      color: 0x4ef7ff,
+      transparent: true,
+      opacity: 0.25,
+      linewidth: 2
+    });
+    const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
+    orbitLine.rotation.x = Math.PI / 2.6;
+    scene.add(orbitLine);
+
+    // LUCI
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xffffff, 2);
+    sunLight.position.set(5, 3, 5);
+    sunLight.castShadow = true;
+    scene.add(sunLight);
+
+    const rimLight = new THREE.PointLight(0x48ffd1, 1, 50);
+    rimLight.position.set(-4, 1, -2);
+    scene.add(rimLight);
+
+    // STELLE DI SFONDO
+    const starsGeometry = new THREE.BufferGeometry();
+    const starPositions = [];
+    const starCount = 2500;
+
+    for (let i = 0; i < starCount; i++) {
+      const r = 50 + Math.random() * 100;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+
+      starPositions.push(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.sin(phi) * Math.sin(theta),
+        r * Math.cos(phi)
+      );
+    }
+
+    starsGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPositions), 3));
+    const starsMaterial = new THREE.PointsMaterial({
+      color: 0xbfffee,
+      size: 0.1,
+      sizeAttenuation: true
+    });
+    const stars = new THREE.Points(starsGeometry, starsMaterial);
+    scene.add(stars);
+
+    // ANIMAZIONE
+    let moonAngle = 0;
+
     function animate() {
       requestAnimationFrame(animate);
 
       // Rotazione Terra
-      earth.rotation.y += 0.005;
+      earth.rotation.y += 0.0005;
+      
+      // Rotazione Nuvole
+      clouds.rotation.y += 0.0007;
+      
+      // Rotazione Atmosfera
+      atmosphere.rotation.y -= 0.0002;
 
-      // Orbita Luna
-      const time = Date.now() * 0.0005;
-      moon.position.x = Math.cos(time) * 2.5;
-      moon.position.y = Math.sin(time) * 1.5;
-      moon.rotation.y += 0.005;
+      // Orbita e Rotazione Luna
+      moonAngle += 0.002;
+      moon.position.x = Math.cos(moonAngle) * 2.2;
+      moon.position.z = Math.sin(moonAngle) * 1.55 * Math.cos(Math.PI / 2.6);
+      moon.position.y = Math.sin(moonAngle) * 1.55 * Math.sin(Math.PI / 2.6);
+      moon.rotation.y += 0.003;
+
+      // Movimento lieve della scena
+      earth.rotation.z = Math.sin(Date.now() * 0.0001) * 0.02;
+
+      // Rotazione stelle
+      stars.rotation.y += 0.00005;
 
       renderer.render(scene, camera);
     }
