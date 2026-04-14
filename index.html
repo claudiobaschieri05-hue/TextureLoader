@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Earth + Moon Orbit HUD</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #09131f 0%, #020407 58%, #000 100%);
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    #scene {
+      position: fixed;
+      inset: 0;
+    }
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      color: #7cffc9;
+      text-shadow: 0 0 10px rgba(124,255,201,.55);
+      mix-blend-mode: screen;
+    }
+    .label {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      letter-spacing: .16em;
+      font-size: 13px;
+    }
+    .label2 {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      letter-spacing: .16em;
+      font-size: 13px;
+    }
+    .scan {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,.02) 0 2px,
+        transparent 2px 5px
+      );
+      opacity: .25;
+    }
+    .vignette {
+      position: absolute;
+      inset: 0;
+      box-shadow: inset 0 0 180px rgba(0,0,0,.85);
+    }
+  </style>
+</head>
+<body>
+  <div id="scene"></div>
+  <div class="hud">
+    <div class="label">EARTH + MOON ORBIT</div>
+    <div class="label2">ONLINE / REALISTIC TEXTURES</div>
+    <div class="scan"></div>
+    <div class="vignette"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+  <script>
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 4.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.getElementById('scene').appendChild(renderer.domElement);
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    const earthGroup = new THREE.Group();
+    root.add(earthGroup);
+
+    const loader = new THREE.TextureLoader();
+
+    // Puoi sostituire questi URL con texture hostate da te o con file locali.
+    const earthMap = loader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg');
+    const earthBump = loader.load('https://threejs.org/examples/textures/planets/earth_bump_2048.jpg');
+    const earthSpec = loader.load('https://threejs.org/examples/textures/planets/earth_specular_2048.jpg');
+    const moonMap = loader.load('https://threejs.org/examples/textures/planets/moon_1024.jpg');
+
+    const earth = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 96, 96),
+      new THREE.MeshStandardMaterial({
+        map: earthMap,
+        bumpMap: earthBump,
+        bumpScale: 0.06,
+        roughnessMap: earthSpec,
+        roughness: 0.95,
+        metalness: 0.02
+      })
+    );
+    earthGroup.add(earth);
+
+    const clouds = new THREE.Mesh(
+      new THREE.SphereGeometry(1.01, 96, 96),
+      new THREE.MeshStandardMaterial({
+        map: loader.load('https://threejs.org/examples/textures/planets/earth_clouds_1024.png'),
+        transparent: true,
+        opacity: 0.7,
+        depthWrite: false
+      })
+    );
+    earthGroup.add(clouds);
+
+    const atmosphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1.08, 64, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0x4ef7ff,
+        transparent: true,
+        opacity: 0.08,
+        side: THREE.BackSide
+      })
+    );
+    earthGroup.add(atmosphere);
+
+    const moonOrbit = new THREE.Group();
+    root.add(moonOrbit);
+
+    const moonPath = new THREE.Line(
+      new THREE.EllipseCurve(0, 0, 2.2, 1.55, 0, Math.PI * 2, false, 0).getPoints(256).reduce((g, p, i) => {
+        g.push(p.x, p.y, 0);
+        return g;
+      }, []),
+      new THREE.LineBasicMaterial({ color: 0x4ef7ff, transparent: true, opacity: 0.18 })
+    );
+    moonPath.rotation.x = Math.PI / 2.6;
+    moonOrbit.add(moonPath);
+
+    const moon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.27, 48, 48),
+      new THREE.MeshStandardMaterial({
+        map: moonMap,
+        roughness: 1,
+        metalness: 0
+      })
+    );
+    moonOrbit.add(moon);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 1.1);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 2.8);
+    sun.position.set(5, 2, 5);
+    scene.add(sun);
+
+    const rim = new THREE.PointLight(0x48ffd1, 1.3, 30);
+    rim.position.set(-4, 1, -2);
+    scene.add(rim);
+
+    const starsGeo = new THREE.BufferGeometry();
+    const starCount = 2500;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      const r = 18 + Math.random() * 35;
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos((Math.random() * 2) - 1);
+      starPos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+      starPos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
+      starPos[i * 3 + 2] = r * Math.cos(ph);
+    }
+    starsGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(
+      starsGeo,
+      new THREE.PointsMaterial({ color: 0xbfffee, size: 0.03, sizeAttenuation: true })
+    );
+    scene.add(stars);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      earth.rotation.y += 0.0035;
+      clouds.rotation.y += 0.0045;
+      atmosphere.rotation.y -= 0.0015;
+
+      moonOrbit.rotation.z += 0.004;
+      moon.position.set(2.2, 0, 0);
+      moon.rotation.y += 0.01;
+
+      root.rotation.x = Math.sin(Date.now() * 0.00025) * 0.05;
+      root.rotation.y = Math.sin(Date.now() * 0.00012) * 0.08;
+
+      stars.rotation.y += 0.0002;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
